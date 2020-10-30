@@ -2,30 +2,12 @@
 @import <AppKit/AppKit.j>
 @import "three.js"
 
-@implementation AppController : CPObject
-{
-
-}
-
-- (void)applicationDidFinishLaunching:(CPNotification)aNotification
-{
-    var theWindow = [[CPWindow alloc] initWithContentRect:CGRectMakeZero() styleMask:CPBorderlessBridgeWindowMask],
-        contentView = [theWindow contentView];
-
-    var mainview = [[Cubeview alloc] initWithFrame: [contentView bounds]];
-    [contentView addSubview:mainview];
-
-    [theWindow orderFront:self];
-
-    // Uncomment the following line to turn on the standard menu bar.
-    [CPMenu setMenuBarVisible:YES];
-}
-
-@end
 
 @implementation Cubeview : CPView
 {
     id scene, camera, renderer, raycaster, group, curnormal, curcube, curmesh, boxes;
+
+    id colorSource @accessors;
 }
 
 - (id)initWithFrame:(CGRect)aRect
@@ -66,8 +48,7 @@
 
 
         // First cube
-        [self makeCubeAt:new THREE.Vector3(0, 0, 0)];
-
+        [self makeCubeAt:new THREE.Vector3(0, 0, 0) withColor:0xffffff];
 
         var is_down = false;
         var last = [0,0];
@@ -92,7 +73,7 @@
                     var face = chl.geometry.faces[f];
                     if (face.color)
                     {
-                        face.color.setHex(0xffffff);
+                        face.color.set(chl.geometry.intcolor);
                     }
                 }
             }
@@ -121,14 +102,13 @@
         };
 
         renderer.domElement.onclick = function(e) {
-            console.log("create", curcube)
             if (!curnormal) { return; }
 
             var x = curnormal.x + curcube.position.x;
             var y = curnormal.y + curcube.position.y;
             var z = curnormal.z + curcube.position.z;
 
-            [self makeCubeAt:new THREE.Vector3(x, y, z)];
+            [self makeCubeAt:new THREE.Vector3(x, y, z) withColor:[self color]];
 
             [self setNeedsDisplay:YES];
         };
@@ -158,7 +138,7 @@
     return self
 }
 
-- (void)makeCubeAt:(id)vector3
+- (void)makeCubeAt:(id)vector3 withColor:(int)color
 {
     var x = vector3.x;
     var y = vector3.y;
@@ -172,9 +152,10 @@
 
     newgeom.translate(x, y, z);
     newgeom.position = new THREE.Vector3(x, y, z);
+    newgeom.intcolor = color;
     var newmat = new THREE.MeshBasicMaterial( {
         vertexColors: THREE.FaceColors,
-        color: 0xffffff
+        color: newgeom.intcolor
     } );
     var newcube = new THREE.Mesh( newgeom, newmat );
 
@@ -217,6 +198,46 @@
 - (void)drawRect:(CGRect)aRect
 {
     renderer.render( scene, camera );
+}
+
+- (int)color
+{
+    console.log(parseInt("0x" + [[colorSource color] hexString]))
+    return parseInt("0x" + [[colorSource color] hexString]);
+}
+@end
+
+@implementation AppController : CPObject
+{
+    CPColorPanel colorpanel;
+    Cubeview mainview;
+}
+
+- (void)applicationDidFinishLaunching:(CPNotification)aNotification
+{
+    var theWindow = [[CPWindow alloc] initWithContentRect:CGRectMakeZero() styleMask:CPBorderlessBridgeWindowMask],
+        contentView = [theWindow contentView];
+
+    colorpanel = [CPColorPanel sharedColorPanel];
+    [colorpanel setColor:[CPColor whiteColor]];
+
+    mainview = [[Cubeview alloc] initWithFrame: [contentView bounds]];
+    [contentView addSubview:mainview];
+    [mainview setColorSource:colorpanel];
+
+    [theWindow orderFront:self];
+
+    // Uncomment the following line to turn on the standard menu bar.
+    [CPMenu setMenuBarVisible:YES];
+
+    var menu = [[CPApplication sharedApplication] mainMenu];
+
+    [menu addItemWithTitle:"Colors" action:@selector(openPanel:) keyEquivalent:"c"];
+}
+
+- (id)openPanel:(id)sender
+{
+    [colorpanel orderFront:self];
 }
 
 @end
