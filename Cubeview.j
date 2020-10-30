@@ -45,7 +45,6 @@
         group = new THREE.Group();
         scene.add( group );
 
-
         // First cube
         [self makeCubeAt:new THREE.Vector3(0, 0, 0) withColor:0xffffff];
 
@@ -207,11 +206,38 @@
 
 - (CPString)data
 {
-    return btoa(JSON.stringify(boxes))
+  var output = {}
+
+  for(var key in boxes)
+  {
+    var box = boxes[key]
+    if (!box) { continue; }
+    output[key] = {
+      color: box.mesh.geometry.intcolor,
+      pos: [
+        box.mesh.geometry.position.x,
+        box.mesh.geometry.position.y,
+        box.mesh.geometry.position.z
+      ]
+    }
+  }
+  return btoa(JSON.stringify(output))
 }
 
 - (void)setData:(CPString)data
 {
-    boxes = JSON.parse(atob(data))
+  var input = JSON.parse(atob(data))
+  scene.remove(group);
+
+  group = new THREE.Group();
+  scene.add( group );
+  boxes = {}
+
+  for(var key in input)
+  {
+    var x = input[key]
+    [self makeCubeAt:new THREE.Vector3(x.pos[0], x.pos[1], x.pos[2])
+           withColor:x.color]
+  }
 }
 @end
