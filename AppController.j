@@ -25,7 +25,7 @@
 
 @implementation Cubeview : CPView
 {
-    id scene, camera, renderer;
+    id scene, camera, renderer, cube;
 }
 
 - (id)initWithFrame:(CGRect)aRect
@@ -45,13 +45,59 @@
         _DOMElement.appendChild( renderer.domElement );
 
         var geometry = new THREE.BoxGeometry();
-        var material = new THREE.MeshBasicMaterial( { color: 0x00ff00 } );
-        var cube = new THREE.Mesh( geometry, material );
+        var material = new THREE.LineBasicMaterial( {
+            color: 0xffffff,
+            linecap: 'round', //ignored by WebGLRenderer
+            linejoin:  'round' //ignored by WebGLRenderer
+        } );
+        material.wireframe = true
+        cube = new THREE.Mesh( geometry, material );
         scene.add( cube );
 
         camera.position.z = 5;
+
+        var light = new THREE.PointLight( 0x0000ff, 1, 100 );
+        light.position.set( 6, 6, 6 );
+        scene.add( light );
+
+        var light = new THREE.PointLight( 0x00ff00, 1, 100 );
+        light.position.set( -6, -6, -6 );
+        scene.add( light );
+
+        var light = new THREE.AmbientLight( 0x404040 ); // soft white light
+        scene.add( light );
+
+
+        var is_down = false;
+        var last = [0,0];
+        renderer.domElement.onmousedown = function(e) {
+            is_down = true;
+            last = [e.screenX, e.screenY];
+        };
+
+        renderer.domElement.onmousemove = function(e) {
+            if (!is_down) { return; }
+
+            var dx = e.screenX - last[0];
+            var dy = e.screenY - last[1];
+
+            [self rotateCam: CGPointMake(dx, dy)];
+            last = [e.screenX, e.screenY];
+        };
+
+        renderer.domElement.onmouseup = function(e) {
+            is_down = false;
+        };
     }
     return self
+}
+
+- (void)rotateCam:(CGPoint)pt
+{
+    cube.rotation.x += pt.y/100;
+    cube.rotation.y += pt.x/100;
+
+    [self setNeedsDisplay:YES];
 }
 
 - (void)drawRect:(CGRect)aRect
