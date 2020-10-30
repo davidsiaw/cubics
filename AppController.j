@@ -25,7 +25,7 @@
 
 @implementation Cubeview : CPView
 {
-    id scene, camera, renderer, cube;
+    id scene, camera, renderer, raycaster, cube;
 }
 
 - (id)initWithFrame:(CGRect)aRect
@@ -44,13 +44,14 @@
         renderer.setSize(width, height);
         _DOMElement.appendChild( renderer.domElement );
 
+        raycaster = new THREE.Raycaster();
+
         var geometry = new THREE.BoxGeometry();
-        var material = new THREE.LineBasicMaterial( {
-            color: 0xffffff,
-            linecap: 'round', //ignored by WebGLRenderer
-            linejoin:  'round' //ignored by WebGLRenderer
+        var material = new THREE.MeshBasicMaterial( {
+            vertexColors: THREE.VertexColors,
+            color: 0xffffff
         } );
-        material.wireframe = true
+        //material.wireframe = true
         cube = new THREE.Mesh( geometry, material );
         scene.add( cube );
 
@@ -76,6 +77,22 @@
         };
 
         renderer.domElement.onmousemove = function(e) {
+            var mouse = new THREE.Vector2();
+            mouse.x = ( e.offsetX / width ) * 2 - 1 + [self bounds].origin.x;
+            mouse.y = - ( e.offsetY / height ) * 2 + 1 + [self bounds].origin.y;
+
+            for (var i in geometry.faces)
+            {
+                if (geometry.faces[i].color)
+                {
+                    geometry.faces[i].color.setHex(0xffffff);
+
+                }
+            }
+
+            [self updateSelect:mouse];
+            geometry.elementsNeedUpdate = true;
+
             if (!is_down) { return; }
 
             var dx = e.screenX - last[0];
@@ -88,6 +105,11 @@
         renderer.domElement.onmouseup = function(e) {
             is_down = false;
         };
+
+        renderer.domElement.onwheel = function(e) {
+            camera.position.z += e.deltaY/10;
+            [self setNeedsDisplay:YES];
+        };
     }
     return self
 }
@@ -97,6 +119,26 @@
     cube.rotation.x += pt.y/100;
     cube.rotation.y += pt.x/100;
 
+    [self setNeedsDisplay:YES];
+}
+
+- (void)updateSelect:(id)mouse
+{
+    // update the picking ray with the camera and mouse position
+    raycaster.setFromCamera( mouse, camera );
+
+    // calculate objects intersecting the picking ray
+    var intersects = raycaster.intersectObjects( scene.children );
+
+    for ( var i = 0; i < intersects.length; i ++ ) {
+        var normal = intersects[i].face.normal;
+        for ( var c = 0; c < intersects[i].object.geometry.faces.length; c++ ) {
+            var face = intersects[i].object.geometry.faces[c];
+            if (face.normal.equals(normal)) {
+                face.color.set(0xff0000)
+            }
+        }
+    }
     [self setNeedsDisplay:YES];
 }
 
