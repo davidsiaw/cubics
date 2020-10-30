@@ -25,7 +25,7 @@
 
 @implementation Cubeview : CPView
 {
-    id scene, camera, renderer, raycaster, cube;
+    id scene, camera, renderer, raycaster, group, curnormal, curcube, curmesh, boxes;
 }
 
 - (id)initWithFrame:(CGRect)aRect
@@ -37,6 +37,8 @@
         var width = [self bounds].size.width;
         var height = [self bounds].size.height;
 
+        boxes = {}
+
         scene = new THREE.Scene();
         camera = new THREE.PerspectiveCamera(75, width / height, 0.1, 1000 );
 
@@ -45,15 +47,6 @@
         _DOMElement.appendChild( renderer.domElement );
 
         raycaster = new THREE.Raycaster();
-
-        var geometry = new THREE.BoxGeometry();
-        var material = new THREE.MeshBasicMaterial( {
-            vertexColors: THREE.VertexColors,
-            color: 0xffffff
-        } );
-        //material.wireframe = true
-        cube = new THREE.Mesh( geometry, material );
-        scene.add( cube );
 
         camera.position.z = 5;
 
@@ -68,6 +61,13 @@
         var light = new THREE.AmbientLight( 0x404040 ); // soft white light
         scene.add( light );
 
+        group = new THREE.Group();
+        scene.add( group );
+
+
+        // First cube
+        [self makeCubeAt:new THREE.Vector3(0, 0, 0)];
+
 
         var is_down = false;
         var last = [0,0];
@@ -81,17 +81,31 @@
             mouse.x = ( e.offsetX / width ) * 2 - 1 + [self bounds].origin.x;
             mouse.y = - ( e.offsetY / height ) * 2 + 1 + [self bounds].origin.y;
 
-            for (var i in geometry.faces)
+            for (var i in group.children)
             {
-                if (geometry.faces[i].color)
-                {
-                    geometry.faces[i].color.setHex(0xffffff);
+                var chl = group.children[i];
 
+                if (!chl.geometry) { continue; }
+
+                for (var f in chl.geometry.faces)
+                {
+                    var face = chl.geometry.faces[f];
+                    if (face.color)
+                    {
+                        face.color.setHex(0xffffff);
+                    }
                 }
             }
 
+            curnormal = null;
             [self updateSelect:mouse];
-            geometry.elementsNeedUpdate = true;
+
+            for (var i in group.children)
+            {
+                var chl = group.children[i];
+                if (!chl.geometry) { continue; }
+                chl.geometry.colorsNeedUpdate = true;
+            }
 
             if (!is_down) { return; }
 
@@ -106,18 +120,72 @@
             is_down = false;
         };
 
+        renderer.domElement.onclick = function(e) {
+            console.log("create", curcube)
+            if (!curnormal) { return; }
+
+            var x = curnormal.x + curcube.position.x;
+            var y = curnormal.y + curcube.position.y;
+            var z = curnormal.z + curcube.position.z;
+
+            [self makeCubeAt:new THREE.Vector3(x, y, z)];
+
+            [self setNeedsDisplay:YES];
+        };
+
+        renderer.domElement.oncontextmenu = function(e) {
+            console.log("delete", curcube)
+            if (!curnormal) { return; }
+
+            var x = curcube.position.x;
+            var y = curcube.position.y;
+            var z = curcube.position.z;
+
+            var key = x + "," + y + "," + z;
+            if (!boxes[key]) { return; }
+
+            group.remove(curmesh);
+            boxes[key] = undefined;
+        };
+
         renderer.domElement.onwheel = function(e) {
             camera.position.z += e.deltaY/10;
             [self setNeedsDisplay:YES];
         };
+
+
     }
     return self
 }
 
+- (void)makeCubeAt:(id)vector3
+{
+    var x = vector3.x;
+    var y = vector3.y;
+    var z = vector3.z;
+
+    var key = x + "," + y + "," + z;
+
+    if (boxes[key]) { console.log(key, "exists"); return; }
+
+    var newgeom = new THREE.BoxGeometry();
+
+    newgeom.translate(x, y, z);
+    newgeom.position = new THREE.Vector3(x, y, z);
+    var newmat = new THREE.MeshBasicMaterial( {
+        vertexColors: THREE.FaceColors,
+        color: 0xffffff
+    } );
+    var newcube = new THREE.Mesh( newgeom, newmat );
+
+    boxes[key] = { mesh: newcube };
+    group.add(newcube);
+}
+
 - (void)rotateCam:(CGPoint)pt
 {
-    cube.rotation.x += pt.y/100;
-    cube.rotation.y += pt.x/100;
+    group.rotation.x += pt.y/100;
+    group.rotation.y += pt.x/100;
 
     [self setNeedsDisplay:YES];
 }
@@ -128,7 +196,7 @@
     raycaster.setFromCamera( mouse, camera );
 
     // calculate objects intersecting the picking ray
-    var intersects = raycaster.intersectObjects( scene.children );
+    var intersects = raycaster.intersectObjects( group.children );
 
     for ( var i = 0; i < intersects.length; i ++ ) {
         var normal = intersects[i].face.normal;
@@ -138,6 +206,10 @@
                 face.color.set(0xff0000)
             }
         }
+        curnormal = normal
+        curcube = intersects[i].object.geometry
+        curmesh = intersects[i].object
+        break;
     }
     [self setNeedsDisplay:YES];
 }
